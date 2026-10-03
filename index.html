@@ -1,188 +1,127 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>TikTok LIVE Elapsed Timer</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TikTok LIVE Timer</title>
 <style>
-  :root {
-    --font-size: 42px;
-    --pill-bg: rgba(0,0,0,.48);
-    --text: #fff;
-    --dot: #ff2d55;
-  }
-
-  html, body {
-    margin: 0;
-    width: 100%;
-    height: 100%;
-    background: transparent;
-    overflow: hidden;
-    font-family: Arial, Helvetica, sans-serif;
-  }
-
-  #overlay {
-    position: absolute;
-    left: 24px;
-    top: 24px;
-    display: inline-flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px 18px;
-    border-radius: 14px;
-    background: var(--pill-bg);
-    color: var(--text);
-    font-size: var(--font-size);
-    font-weight: 700;
-    line-height: 1;
-    letter-spacing: .5px;
-    text-shadow: 0 1px 2px rgba(0,0,0,.6);
-    user-select: none;
-  }
-
-  .dot {
-    width: .45em;
-    height: .45em;
-    border-radius: 50%;
-    background: var(--dot);
-    box-shadow: 0 0 10px rgba(255,45,85,.55);
-    flex: 0 0 auto;
-  }
-
-  #label {
-    font-size: .72em;
-    letter-spacing: 1px;
-  }
-
-  #timer {
-    font-variant-numeric: tabular-nums;
-    min-width: 8ch;
-  }
-
-  #controls {
-    position: fixed;
-    right: 12px;
-    bottom: 12px;
-    display: flex;
-    gap: 8px;
-    opacity: .15;
-    transition: opacity .2s ease;
-  }
-
-  #controls:hover {
-    opacity: 1;
-  }
-
-  button {
-    border: 0;
-    border-radius: 8px;
-    padding: 9px 12px;
-    font-size: 14px;
-    cursor: pointer;
-    background: rgba(0,0,0,.75);
-    color: white;
-  }
-
-  /* Tambahkan ?clean=1 pada URL untuk menyembunyikan tombol sepenuhnya */
-  body.clean #controls {
-    display: none;
-  }
+html,body{margin:0;width:100%;height:100%;background:transparent;font-family:Arial,Helvetica,sans-serif}
+body{color:#fff}
+#overlay{
+  position:absolute;left:24px;top:24px;
+  display:inline-flex;align-items:center;gap:10px;
+  padding:11px 16px;border-radius:12px;
+  background:rgba(0,0,0,.48);
+  font-weight:700;font-size:38px;
+  text-shadow:0 1px 2px rgba(0,0,0,.7)
+}
+.dot{width:16px;height:16px;border-radius:50%;background:#ff2d55;box-shadow:0 0 8px rgba(255,45,85,.6)}
+.live{font-size:28px;letter-spacing:1px}
+#timer{font-variant-numeric:tabular-nums}
+#control{
+  box-sizing:border-box;
+  max-width:760px;margin:50px auto;padding:28px;
+  background:#16181d;border-radius:16px;color:#fff
+}
+#control h1{margin-top:0;font-size:26px}
+#control p{line-height:1.55;color:#d7d7d7}
+button{
+  border:0;border-radius:9px;padding:12px 17px;
+  margin:4px;font-size:15px;cursor:pointer
+}
+.primary{background:#fe2c55;color:white}
+.secondary{background:#30343b;color:white}
+#url{
+  margin-top:16px;padding:12px;border-radius:8px;
+  background:#090a0d;word-break:break-all;color:#a9e4ff;
+  user-select:all
+}
+.note{font-size:13px;color:#a9abb2!important}
+.hidden{display:none!important}
 </style>
 </head>
 <body>
-  <div id="overlay">
-    <span class="dot"></span>
-    <span id="label">LIVE</span>
-    <span id="timer">00:00:00</span>
-  </div>
 
-  <div id="controls">
-    <button id="start">Start</button>
-    <button id="pause">Pause</button>
-    <button id="reset">Reset</button>
-  </div>
+<div id="overlay" class="hidden">
+  <span class="dot"></span>
+  <span class="live">LIVE</span>
+  <span id="timer">00:00:00</span>
+</div>
+
+<div id="control" class="hidden">
+  <h1>TikTok LIVE Timer</h1>
+  <p>
+    Klik <b>Mulai LIVE</b> tepat saat kamu mulai siaran.
+    Halaman ini akan membuat URL overlay yang memakai waktu mulai absolut,
+    sehingga TikTok LIVE Studio dan browser menampilkan durasi yang sama.
+  </p>
+
+  <button class="primary" id="make">Mulai LIVE & Buat URL</button>
+  <button class="secondary" id="copy" disabled>Copy URL Overlay</button>
+
+  <div id="url">Belum ada URL.</div>
+
+  <p class="note">
+    Setiap LIVE baru, buat URL baru. Jangan memakai URL sesi sebelumnya.
+  </p>
+</div>
 
 <script>
-(() => {
-  const timerEl = document.getElementById('timer');
-  const params = new URLSearchParams(location.search);
+const params = new URLSearchParams(location.search);
+const startParam = params.get("start");
+const overlay = document.getElementById("overlay");
+const control = document.getElementById("control");
+const timer = document.getElementById("timer");
 
-  if (params.get('clean') === '1') document.body.classList.add('clean');
+function fmt(ms){
+  const total = Math.max(0, Math.floor(ms/1000));
+  const h = Math.floor(total/3600);
+  const m = Math.floor((total%3600)/60);
+  const s = total%60;
+  return [h,m,s].map(v=>String(v).padStart(2,"0")).join(":");
+}
 
-  const STORAGE_KEY = 'tiktok_live_elapsed_timer_v1';
+if(startParam && /^\d+$/.test(startParam)){
+  control.classList.add("hidden");
+  overlay.classList.remove("hidden");
+  const startedAt = Number(startParam);
 
-  let state = {
-    running: false,
-    startedAt: null,
-    accumulatedMs: 0
+  function tick(){
+    timer.textContent = fmt(Date.now() - startedAt);
+    requestAnimationFrame(tick);
+  }
+  tick();
+}else{
+  overlay.classList.add("hidden");
+  control.classList.remove("hidden");
+
+  const make = document.getElementById("make");
+  const copy = document.getElementById("copy");
+  const urlBox = document.getElementById("url");
+  let generated = "";
+
+  make.onclick = () => {
+    const start = Date.now();
+    generated =
+      location.origin +
+      location.pathname +
+      "?start=" + start;
+    urlBox.textContent = generated;
+    copy.disabled = false;
   };
 
-  function load() {
-    try {
-      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
-      if (saved && typeof saved === 'object') state = {...state, ...saved};
-    } catch (_) {}
-  }
-
-  function save() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  }
-
-  function elapsedMs() {
-    if (!state.running || !state.startedAt) return state.accumulatedMs;
-    return state.accumulatedMs + (Date.now() - state.startedAt);
-  }
-
-  function format(ms) {
-    const total = Math.max(0, Math.floor(ms / 1000));
-    const h = Math.floor(total / 3600);
-    const m = Math.floor((total % 3600) / 60);
-    const s = total % 60;
-    return [h, m, s].map(v => String(v).padStart(2, '0')).join(':');
-  }
-
-  function render() {
-    timerEl.textContent = format(elapsedMs());
-    requestAnimationFrame(render);
-  }
-
-  function start() {
-    if (state.running) return;
-    state.running = true;
-    state.startedAt = Date.now();
-    save();
-  }
-
-  function pause() {
-    if (!state.running) return;
-    state.accumulatedMs = elapsedMs();
-    state.running = false;
-    state.startedAt = null;
-    save();
-  }
-
-  function reset() {
-    state = {
-      running: false,
-      startedAt: null,
-      accumulatedMs: 0
-    };
-    save();
-  }
-
-  document.getElementById('start').addEventListener('click', start);
-  document.getElementById('pause').addEventListener('click', pause);
-  document.getElementById('reset').addEventListener('click', reset);
-
-  load();
-
-  // Sinkron antar-tab/source jika halaman timer dibuka lebih dari sekali
-  window.addEventListener('storage', (e) => {
-    if (e.key === STORAGE_KEY) load();
-  });
-
-  render();
-})();
+  copy.onclick = async () => {
+    if(!generated) return;
+    try{
+      await navigator.clipboard.writeText(generated);
+      copy.textContent = "Tersalin!";
+      setTimeout(()=>copy.textContent="Copy URL Overlay",1500);
+    }catch(e){
+      urlBox.focus?.();
+      alert("Copy otomatis gagal. Blok URL di bawah lalu copy manual.");
+    }
+  };
+}
 </script>
 </body>
 </html>
