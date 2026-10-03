@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>TikTok LIVE Elapsed Timer</title>
+<style>
+  :root {
+    --font-size: 42px;
+    --pill-bg: rgba(0,0,0,.48);
+    --text: #fff;
+    --dot: #ff2d55;
+  }
+
+  html, body {
+    margin: 0;
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    overflow: hidden;
+    font-family: Arial, Helvetica, sans-serif;
+  }
+
+  #overlay {
+    position: absolute;
+    left: 24px;
+    top: 24px;
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 18px;
+    border-radius: 14px;
+    background: var(--pill-bg);
+    color: var(--text);
+    font-size: var(--font-size);
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: .5px;
+    text-shadow: 0 1px 2px rgba(0,0,0,.6);
+    user-select: none;
+  }
+
+  .dot {
+    width: .45em;
+    height: .45em;
+    border-radius: 50%;
+    background: var(--dot);
+    box-shadow: 0 0 10px rgba(255,45,85,.55);
+    flex: 0 0 auto;
+  }
+
+  #label {
+    font-size: .72em;
+    letter-spacing: 1px;
+  }
+
+  #timer {
+    font-variant-numeric: tabular-nums;
+    min-width: 8ch;
+  }
+
+  #controls {
+    position: fixed;
+    right: 12px;
+    bottom: 12px;
+    display: flex;
+    gap: 8px;
+    opacity: .15;
+    transition: opacity .2s ease;
+  }
+
+  #controls:hover {
+    opacity: 1;
+  }
+
+  button {
+    border: 0;
+    border-radius: 8px;
+    padding: 9px 12px;
+    font-size: 14px;
+    cursor: pointer;
+    background: rgba(0,0,0,.75);
+    color: white;
+  }
+
+  /* Tambahkan ?clean=1 pada URL untuk menyembunyikan tombol sepenuhnya */
+  body.clean #controls {
+    display: none;
+  }
+</style>
+</head>
+<body>
+  <div id="overlay">
+    <span class="dot"></span>
+    <span id="label">LIVE</span>
+    <span id="timer">00:00:00</span>
+  </div>
+
+  <div id="controls">
+    <button id="start">Start</button>
+    <button id="pause">Pause</button>
+    <button id="reset">Reset</button>
+  </div>
+
+<script>
+(() => {
+  const timerEl = document.getElementById('timer');
+  const params = new URLSearchParams(location.search);
+
+  if (params.get('clean') === '1') document.body.classList.add('clean');
+
+  const STORAGE_KEY = 'tiktok_live_elapsed_timer_v1';
+
+  let state = {
+    running: false,
+    startedAt: null,
+    accumulatedMs: 0
+  };
+
+  function load() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+      if (saved && typeof saved === 'object') state = {...state, ...saved};
+    } catch (_) {}
+  }
+
+  function save() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+
+  function elapsedMs() {
+    if (!state.running || !state.startedAt) return state.accumulatedMs;
+    return state.accumulatedMs + (Date.now() - state.startedAt);
+  }
+
+  function format(ms) {
+    const total = Math.max(0, Math.floor(ms / 1000));
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const s = total % 60;
+    return [h, m, s].map(v => String(v).padStart(2, '0')).join(':');
+  }
+
+  function render() {
+    timerEl.textContent = format(elapsedMs());
+    requestAnimationFrame(render);
+  }
+
+  function start() {
+    if (state.running) return;
+    state.running = true;
+    state.startedAt = Date.now();
+    save();
+  }
+
+  function pause() {
+    if (!state.running) return;
+    state.accumulatedMs = elapsedMs();
+    state.running = false;
+    state.startedAt = null;
+    save();
+  }
+
+  function reset() {
+    state = {
+      running: false,
+      startedAt: null,
+      accumulatedMs: 0
+    };
+    save();
+  }
+
+  document.getElementById('start').addEventListener('click', start);
+  document.getElementById('pause').addEventListener('click', pause);
+  document.getElementById('reset').addEventListener('click', reset);
+
+  load();
+
+  // Sinkron antar-tab/source jika halaman timer dibuka lebih dari sekali
+  window.addEventListener('storage', (e) => {
+    if (e.key === STORAGE_KEY) load();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
